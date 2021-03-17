@@ -32,7 +32,6 @@ class ConnectedDeviceCubit extends Cubit<ConnectedDeviceState> {
   }
 
   void setCurrentDevice(BluetoothDevice device) {
-    print("Current device will be: ${device.name}");
     emit(state.copyWith(currentDevice: device));
   }
 
@@ -60,17 +59,11 @@ class ConnectedDeviceCubit extends Cubit<ConnectedDeviceState> {
     print("Initing devices");
     if (state.connectedDevices != null) {
       for (BluetoothDevice device in state.connectedDevices) {
-        print("DEVICE ${device.name}");
         final services = await getDeviceServices(device, context);
         final batteryLevel = await getBatteryLevel(services);
         String dir = (await getExternalStorageDirectory()).absolute.path + "/";
-        final filePath = dir +
-            state.username +
-            "device:${device.name.substring(0,1)}" +
-            DateTime.now().millisecondsSinceEpoch.toString() +
-            ".csv";
-        print("File path");
-        print(filePath);
+        final filePath = dir + state.username + "device:${device.name.substring(0, 1)}" + ".csv";
+
         _setHeartRateListener(device, services, filePath, buildContext);
 
         final vModel = DeviceViewModel(

@@ -1,16 +1,19 @@
 import 'package:band_parameters_reader/data/bitalino_manager.dart';
 import 'package:band_parameters_reader/models/measure.dart';
 import 'package:band_parameters_reader/repositories/bitalino/bitalino_cubit.dart';
-import 'package:band_parameters_reader/ui/bitalino/bitalino_measurment_summary.dart';
 import 'package:band_parameters_reader/utils/colors.dart';
 import 'package:band_parameters_reader/widgets/chart.dart';
+import 'package:band_parameters_reader/widgets/custom_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share/share.dart';
 
 class BitalinoMeasurment extends StatefulWidget {
   final String address;
+  final String name;
 
-  const BitalinoMeasurment({Key key, this.address}) : super(key: key);
+  const BitalinoMeasurment({Key key, this.address, this.name}) : super(key: key);
 
   @override
   _BitalinoMeasurmentState createState() => _BitalinoMeasurmentState();
@@ -19,21 +22,27 @@ class BitalinoMeasurment extends StatefulWidget {
 class _BitalinoMeasurmentState extends State<BitalinoMeasurment> {
   int dropdownValue = 1;
   BitalinoManager manager;
+  String filePath;
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(Duration.zero, () {
+    Future.delayed(Duration.zero, () async {
+      await initPath();
       manager = BitalinoManager(context: context);
-      manager.initialize(widget.address);
+      manager.initialize(widget.address, filePath);
       Future.delayed(Duration(milliseconds: 300), () => manager.connectToDevice());
     });
+  }
+
+  Future initPath() async {
+    String dir = (await getExternalStorageDirectory()).absolute.path + "/";
+    filePath = dir + widget.name + ".csv";
   }
 
   Future<bool> isConnected() async {
     if (manager != null) {
       while (manager.connected() == false) {
-        print("In loop");
         await Future.delayed(Duration(milliseconds: 100), () {});
       }
       return manager.connected();
@@ -51,14 +60,13 @@ class _BitalinoMeasurmentState extends State<BitalinoMeasurment> {
           centerTitle: true,
           backgroundColor: UIColors.GRADIENT_DARK_COLOR,
           title: Text(
-            "Wykonywanie pomiaru Bitalino",
+            "Bitalino Measurment",
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 22),
           ),
         ),
         body: FutureBuilder(
             future: isConnected(),
             builder: (context, snap) {
-              print(snap);
               if (snap.connectionState == ConnectionState.done) {
                 if (manager.connected()) return _body();
                 return Container();
@@ -69,47 +77,102 @@ class _BitalinoMeasurmentState extends State<BitalinoMeasurment> {
   }
 
   Widget _body() {
-    return Stack(children: [
-      Padding(
-          padding: const EdgeInsets.only(left: 15, right: 15, bottom: 80, top: 24),
-          child: BlocBuilder<BitalinoCubit, BitalinoState>(
-            builder: (context, state) => ListView(children: [
-              _chartBuilder(state),
-              SizedBox(height: 16),
-              Row(children: [
-                Expanded(child: _inputPicker()),
-                SizedBox(width: 24),
-                _pauseButton(state),
-              ]),
-              SizedBox(height: 24),
-              _measures(state),
-            ]),
-          )),
-      Align(
-        alignment: Alignment.bottomCenter,
-        child: SizedBox(
-          width: double.infinity,
-          child: Padding(
-              padding: const EdgeInsets.all(15),
-              child: RaisedButton(
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6.0),
-                    side: BorderSide(color: UIColors.GRADIENT_DARK_COLOR)),
-                padding: const EdgeInsets.all(8),
-                color: UIColors.GRADIENT_DARK_COLOR,
-                onPressed: () {
-                  pauseMeasure();
-                  Navigator.of(context)
-                      .push(MaterialPageRoute(builder: (context) => BitalinoMeasurmentSummary()));
-                },
-                child: Text(
-                  'Zakończ pomiar',
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+    return BlocBuilder<BitalinoCubit, BitalinoState>(
+        builder: (context, state) => Stack(children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 15, right: 15, bottom: 80, top: 24),
+                child: ListView(children: [
+                  _chartBuilder(state),
+                  SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(child: _inputPicker()),
+                    SizedBox(width: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _shareButton(),
+                        _pauseButton(state),
+                      ],
+                    ),
+                  ]),
+                  SizedBox(height: 24),
+                  _measures(state),
+                ]),
+              ),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Padding(
+                      padding: const EdgeInsets.all(15),
+                      child: RaisedButton(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6.0),
+                            side: BorderSide(color: UIColors.GRADIENT_DARK_COLOR)),
+                        padding: const EdgeInsets.all(8),
+                        color: UIColors.GRADIENT_DARK_COLOR,
+                        onPressed: () {
+                          pauseMeasure();
+                          showDialog(
+                              context: context,
+                              builder: (context) {
+                                int numberOfMeasure = state.measure[0].last.id * 4;
+                                return Dialog(
+                                  backgroundColor: Colors.white,
+                                  child: Padding(
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "Total number of measures: $numberOfMeasure",
+                                          style: _dialogTextStyle,
+                                        ),
+                                        Divider(),
+                                      ]
+                                        ..add(SizedBox(
+                                          height: 20,
+                                        ))
+                                        ..add(CustomButton(
+                                          onPressed: () {
+                                            Navigator.of(context)
+                                                .popUntil((route) => route.isFirst);
+                                          },
+                                          text: "Exit",
+                                        )),
+                                    ),
+                                  ),
+                                );
+                              });
+                        },
+                        child: Text(
+                          'End measure',
+                          style: TextStyle(
+                              color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                        ),
+                      )),
                 ),
-              )),
-        ),
+              ),
+            ]));
+  }
+
+  TextStyle get _dialogTextStyle => TextStyle(fontSize: 18, fontWeight: FontWeight.w700);
+
+  Widget _shareButton() {
+    return SizedBox(
+      width: MediaQuery.of(context).size.width / 2 - 30,
+      child: CustomButton(
+        onPressed: () => shareFile(),
+        text: "Share",
       ),
-    ]);
+    );
+  }
+
+  shareFile() async {
+    print(filePath);
+    await Share.shareFiles([filePath], text: 'Measurment');
   }
 
   Widget _chartBuilder(BitalinoState state) {
@@ -133,7 +196,7 @@ class _BitalinoMeasurmentState extends State<BitalinoMeasurment> {
 
   Widget _pauseButton(BitalinoState state) {
     return SizedBox(
-      width: MediaQuery.of(context).size.width / 2,
+      width: MediaQuery.of(context).size.width / 2 - 30,
       child: RaisedButton(
         onPressed: state.isCollectingData ? pauseMeasure : resumeMeasure,
         shape: RoundedRectangleBorder(
@@ -142,7 +205,7 @@ class _BitalinoMeasurmentState extends State<BitalinoMeasurment> {
         padding: const EdgeInsets.all(8),
         color: UIColors.GRADIENT_DARK_COLOR,
         child: Text(
-          state.isCollectingData ? "Zatrzymaj" : "Wznów",
+          state.isCollectingData ? "Pause" : "Resume",
           style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
         ),
       ),
@@ -174,12 +237,12 @@ class _BitalinoMeasurmentState extends State<BitalinoMeasurment> {
 
     return Column(
       children: [
-        _textWithValue("Maksymalny pomiar", valueMax),
+        _textWithValue("Max measure", valueMax),
         SizedBox(height: 8),
-        _textWithValue("Minimalny pomiar", valueMin),
+        _textWithValue("Min measure", valueMin),
         SizedBox(height: 8),
         _textWithValue(
-            "Czas od pierwszego pomiaru", _printDuration(Duration(seconds: secondsElapsed))),
+            "Time since first measure", _printDuration(Duration(seconds: secondsElapsed))),
       ],
     );
   }
@@ -234,7 +297,7 @@ class _BitalinoMeasurmentState extends State<BitalinoMeasurment> {
         return DropdownMenuItem<int>(
           value: value,
           child: Text(
-            "Wejście A${value}",
+            "Input A${value}",
             textAlign: TextAlign.center,
           ),
         );

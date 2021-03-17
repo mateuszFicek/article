@@ -6,9 +6,7 @@ import 'package:band_parameters_reader/repositories/measurment/measurment_cubit.
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share/share.dart';
-import 'package:toast/toast.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class BlueManager {
@@ -42,8 +40,6 @@ class BlueManager {
       print(e);
     }
     final state = await device.state.first;
-    print(state);
-
     return state.index;
   }
 
@@ -51,48 +47,6 @@ class BlueManager {
   Future<List<BluetoothService>> discoverDeviceServices(BluetoothDevice device) async {
     final serv = await device.discoverServices();
     return serv;
-  }
-
-  // PRINT CHARACTERISTICS
-  Future printChar(BluetoothService service) async {
-    service.characteristics.forEach((element) async {
-      await Future.delayed(Duration(seconds: 1));
-      element.setNotifyValue(true);
-      await Future.delayed(Duration(seconds: 1));
-
-      element.value.listen((event) {
-        print("EVENT FOR ${element.uuid} IS ${event}");
-      });
-      await Future.delayed(Duration(seconds: 1));
-    });
-  }
-
-  // READ CHARACTERISTICS
-  Future readChar(BluetoothService service) async {
-    print("Service UUID is : ");
-    service.characteristics.forEach((element) {
-      print(element.serviceUuid);
-    });
-    print("Characteristics..");
-    var characteristics = service.characteristics;
-
-    await characteristics.first.setNotifyValue(true);
-    characteristics.first.value.listen((vue) {
-      print("New value is $vue");
-      value = vue[1];
-    });
-
-    print("Descriptors...");
-    var descriptors = service.characteristics.first.descriptors;
-    for (BluetoothDescriptor d in descriptors) {
-      print("d c: ${d.characteristicUuid}");
-      List<int> value = await d.read();
-      print("Value of desc $value");
-    }
-    print(service.deviceId);
-    print(service.includedServices);
-    print(service.isPrimary);
-    print(service.uuid);
   }
 
   setListener(BluetoothDevice device, BluetoothCharacteristic characteristic, String filePath,
@@ -115,10 +69,9 @@ class BlueManager {
         String csv = ListToCsvConverter().convert(rows) + '\n';
         rows.clear();
         await file.writeAsString(csv, mode: FileMode.append);
-        context.bloc<MeasurmentCubit>().addHeartbeatMeasurment(device, Measure(
-            date: DateTime.now(),
-            measure: vue[1],
-            id: id));
+        context
+            .bloc<MeasurmentCubit>()
+            .addHeartbeatMeasurment(device, Measure(date: DateTime.now(), measure: vue[1], id: id));
         id++;
       }
     });
@@ -152,7 +105,6 @@ class BlueManager {
     final canRead = await characteristic.properties.read;
     if (canRead) {
       final batteryValues = await characteristic.read();
-      print("BATTERY VALUE ARE $batteryValues");
       return batteryValues[0];
     }
     return 0;

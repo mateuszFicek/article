@@ -2,6 +2,7 @@ import 'package:band_parameters_reader/repositories/bluetooth_devices/bluetooth_
 import 'package:band_parameters_reader/ui/bitalino/bitalino_measurment.dart';
 import 'package:band_parameters_reader/utils/colors.dart';
 import 'package:band_parameters_reader/widgets/custom_button.dart';
+import 'package:band_parameters_reader/widgets/information_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
@@ -16,6 +17,8 @@ class BluetoothDevices extends StatefulWidget {
 
 class _BluetoothDevicesState extends State<BluetoothDevices>
     with AutomaticKeepAliveClientMixin<BluetoothDevices> {
+  TextEditingController _nameController = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     ScreenUtil.init(context, width: 1080, height: 2340);
@@ -51,6 +54,56 @@ class _BluetoothDevicesState extends State<BluetoothDevices>
     return device.isConnected
         ? _connectedDeviceContainer(device)
         : _disconnectedDeviceContainer(device);
+  }
+
+  Future showNameDialog(BluetoothDevice device) async {
+    await showDialog(
+        context: context,
+        builder: (context) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              width: 400,
+              decoration:
+                  BoxDecoration(borderRadius: BorderRadius.circular(5), color: Colors.white),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16.0),
+                    child: InformationText(
+                      text: "Type your name",
+                    ),
+                  ),
+                  Container(
+                    margin: EdgeInsets.all(16),
+                    child: TextField(
+                      controller: _nameController,
+                      decoration: InputDecoration(
+                          border: OutlineInputBorder(borderSide: BorderSide()), hintText: "Name"),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16),
+                    child: CustomButton(
+                        text: "Continue",
+                        onPressed: () {
+                          try {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        BitalinoMeasurment(address: device.address, name: _nameController.text)));
+                          } catch (exception) {
+                            print('Cannot connect, exception occured');
+                          }
+                        }),
+                  )
+                ],
+              ),
+            ),
+          );
+        });
   }
 
   Widget _connectedDeviceContainer(BluetoothDevice device) {
@@ -115,14 +168,7 @@ class _BluetoothDevicesState extends State<BluetoothDevices>
             textColor: Colors.black,
             child: Text("Connect"),
             onPressed: () async {
-              try {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => BitalinoMeasurment(address: device.address)));
-              } catch (exception) {
-                print('Cannot connect, exception occured');
-              }
+              showNameDialog(device);
             },
           )
         ]));

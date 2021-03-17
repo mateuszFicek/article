@@ -19,12 +19,17 @@ class BitalinoCubit extends Cubit<BitalinoState> {
     List<List<Measure>> measures = state.measure;
     List<Measure> toAddMeasures = measures[index];
     toAddMeasures.add(measure);
+    if (toAddMeasures.length > 300) toAddMeasures.removeAt(0);
     measures.removeAt(index);
     measures.insert(index, toAddMeasures);
     emit(state.copyWith(measures: measures));
   }
 
   startMeasure() {
+    emit(state.copyWith(isCollecting: true));
+  }
+
+  resumeMeasure() {
     emit(state.copyWith(isCollecting: true));
   }
 

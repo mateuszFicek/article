@@ -11,8 +11,6 @@ import 'package:flutter_blue/flutter_blue.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:share/share.dart';
 
-import 'measurment_summary.dart';
-
 class ConnectedDevicePage extends StatefulWidget {
   const ConnectedDevicePage({Key key}) : super(key: key);
 
@@ -69,7 +67,7 @@ class _ConnectedDevicePageState extends State<ConnectedDevicePage> {
                         padding: const EdgeInsets.only(left: 15, right: 15, bottom: 25),
                         child: _measures(state, measureState))),
                 SizedBox(height: 20),
-                _endButton(),
+                _endButton(state, measureState),
               ],
             ),
           ),
@@ -171,7 +169,7 @@ class _ConnectedDevicePageState extends State<ConnectedDevicePage> {
           );
   }
 
-  Widget _endButton() {
+  Widget _endButton(ConnectedDeviceState state, MeasurmentState mState) {
     return Align(
       alignment: Alignment.bottomCenter,
       child: SizedBox(
@@ -186,45 +184,64 @@ class _ConnectedDevicePageState extends State<ConnectedDevicePage> {
               color: UIColors.GRADIENT_DARK_COLOR,
               onPressed: () {
                 pauseMeasure();
-                Navigator.of(context)
-                    .push(MaterialPageRoute(builder: (context) => MeasurmentSummary()));
+                showDialog(
+                    context: context,
+                    builder: (context) {
+                      int numberOfMeasure = mState.heartbeatMeasure.values
+                          .map((v) => v.last.id)
+                          .reduce((a, b) => a + b);
+                      return Dialog(
+                        backgroundColor: Colors.white,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Total number of measures: $numberOfMeasure",
+                                style: _dialogTextStyle,
+                              ),
+                              Divider(),
+                              Text(
+                                "Measures for devices:",
+                                style: _dialog2TextStyle,
+                              ),
+                            ]
+                              ..addAll(
+                                state.viewModels.keys.map((device) {
+                                  return Text(
+                                    "${device.name}: ${mState.heartbeatMeasure[device].last.id}",
+                                    style: _dialogTextStyle,
+                                  );
+                                }),
+                              )
+                              ..add(SizedBox(
+                                height: 20,
+                              ))
+                              ..add(CustomButton(
+                                onPressed: () {
+                                  Navigator.of(context).popUntil((route) => route.isFirst);
+                                },
+                                text: "Exit",
+                              )),
+                          ),
+                        ),
+                      );
+                    });
               },
               child: Text(
                 'End measure',
-                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
               ),
             )),
       ),
     );
   }
 
-//  Widget _heartRateBox(ConnectedDeviceState state) {
-//    return Container(
-//      width: double.infinity,
-//      height: 80.h,
-//      alignment: Alignment.centerLeft,
-//      child: Row(
-//        mainAxisSize: MainAxisSize.min,
-//        crossAxisAlignment: CrossAxisAlignment.center,
-//        mainAxisAlignment: MainAxisAlignment.start,
-//        children: [
-//          Text(
-//            'Last HB measure ${state.currentHeartRate}',
-//            style: TextStyle(color: Colors.white70, fontSize: 40.w),
-//          ),
-//          SizedBox(width: 20.w),
-//          Container(
-//            height: 80.h,
-//            alignment: Alignment.center,
-//            child: Text(
-//              state.lastHeartRateMeasureTime,
-//              style: TextStyle(color: UIColors.LIGHT_FONT_COLOR, fontSize: 25.h),
-//            ),
-//          ),
-//        ],
-//      ),
-//    );
-//  }
+  TextStyle get _dialogTextStyle => TextStyle(fontSize: 18, fontWeight: FontWeight.w700);
+
+  TextStyle get _dialog2TextStyle => TextStyle(fontSize: 18, fontWeight: FontWeight.w400);
 
   Widget _pauseButton(MeasurmentState state) {
     return SizedBox(
@@ -248,7 +265,6 @@ class _ConnectedDevicePageState extends State<ConnectedDevicePage> {
   }
 
   shareFile(String filePath) async {
-    print(filePath);
     await Share.shareFiles([filePath], text: 'Measurment');
   }
 
@@ -261,9 +277,8 @@ class _ConnectedDevicePageState extends State<ConnectedDevicePage> {
   }
 
   Widget _measures(ConnectedDeviceState deviceState, MeasurmentState state) {
-    if(state.heartbeatMeasure[deviceState.currentDevice] == null) return Container();
-    List<Measure> measures =
-        List<Measure>.from(state.heartbeatMeasure[deviceState.currentDevice]);
+    if (state.heartbeatMeasure[deviceState.currentDevice] == null) return Container();
+    List<Measure> measures = List<Measure>.from(state.heartbeatMeasure[deviceState.currentDevice]);
     var valueMax = 0;
     var valueMin = 0;
     int secondsElapsed = 0;
