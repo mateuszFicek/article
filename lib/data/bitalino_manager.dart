@@ -53,11 +53,19 @@ class BitalinoManager {
   }
 
   Future<void> startAcquisition() async {
-    List<List<dynamic>> rows = [];
     int index = 0;
+
+    List<List<int>> measures = [];
     try {
-      await bitalinoController.start([0, 1, 2, 3], Frequency.HZ1000, numberOfSamples: 10,
+      await bitalinoController.start([0, 1, 2, 3], Frequency.HZ100, numberOfSamples: 10,
           onDataAvailable: (frame) async {
+        if (!context.bloc<BitalinoCubit>().state.isCollectingData) {
+          if (measures.length > 0) {
+            _saveToFile(measures, index - measures.length);
+            measures.clear();
+          }
+          return;
+        }
         for (int i = 0; i < 4; i++) {
           Measure measure =
               Measure(date: DateTime.now(), measure: frame.analog[i].round(), id: index);
@@ -65,22 +73,37 @@ class BitalinoManager {
           context.bloc<BitalinoCubit>().addMeasure(measure, i);
         }
 
-        List<dynamic> row = List();
-        row.add(index);
-        row.add(frame.analog[0]);
-        row.add(frame.analog[1]);
-        row.add(frame.analog[2]);
-        row.add(frame.analog[3]);
-        row.add(DateTime.now().toString());
-        rows.add(row);
-        String csv = ListToCsvConverter().convert(rows) + '\n';
-        rows.clear();
-        await file.writeAsString(csv, mode: FileMode.append);
+        measures.add([frame.analog[0], frame.analog[1], frame.analog[2], frame.analog[3]]);
+
+        if (index % 100 == 0 && index != 0) {
+          _saveToFile(measures, index - measures.length + 1);
+          measures.clear();
+        }
+
         index++;
       });
     } catch (e) {
       print(e);
     }
+  }
+
+  Future _saveToFile(List<List<int>> measure, int startingIndex) async {
+    List<List<dynamic>> rows = [];
+    for (int i = 0; i < measure.length; i++) {
+      List<dynamic> row = [];
+      row.add(startingIndex + i);
+      row.add(measure[i][0]);
+      row.add(measure[i][1]);
+      row.add(measure[i][2]);
+      row.add(measure[i][3]);
+      row.add(DateTime.now().toString());
+      print(row);
+      rows.add(row);
+    }
+    String csv = ListToCsvConverter().convert(rows) + '\n';
+    print(csv);
+    rows.clear();
+    await file.writeAsString(csv, mode: FileMode.append);
   }
 
   Future<void> stopAcquisition() async {

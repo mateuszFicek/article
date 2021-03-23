@@ -1,6 +1,7 @@
 import 'package:band_parameters_reader/data/bitalino_manager.dart';
 import 'package:band_parameters_reader/models/measure.dart';
 import 'package:band_parameters_reader/repositories/bitalino/bitalino_cubit.dart';
+import 'package:band_parameters_reader/repositories/measurment/measurment_cubit.dart';
 import 'package:band_parameters_reader/utils/colors.dart';
 import 'package:band_parameters_reader/widgets/chart.dart';
 import 'package:band_parameters_reader/widgets/custom_button.dart';
@@ -23,6 +24,7 @@ class _BitalinoMeasurmentState extends State<BitalinoMeasurment> {
   int dropdownValue = 1;
   BitalinoManager manager;
   String filePath;
+  bool _wasMeasureStarted = false;
 
   @override
   void initState() {
@@ -84,77 +86,21 @@ class _BitalinoMeasurmentState extends State<BitalinoMeasurment> {
                 child: ListView(children: [
                   _chartBuilder(state),
                   SizedBox(height: 16),
-                  Row(children: [
-                    Expanded(child: _inputPicker()),
-                    SizedBox(width: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _shareButton(),
-                        _pauseButton(state),
-                      ],
-                    ),
-                  ]),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _shareButton(),
+                      Spacer(),
+                      _pauseButton(state),
+                    ],
+                  ),
+                  SizedBox(height: 24),
+                  _inputPicker(),
                   SizedBox(height: 24),
                   _measures(state),
                 ]),
               ),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Padding(
-                      padding: const EdgeInsets.all(15),
-                      child: RaisedButton(
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6.0),
-                            side: BorderSide(color: UIColors.GRADIENT_DARK_COLOR)),
-                        padding: const EdgeInsets.all(8),
-                        color: UIColors.GRADIENT_DARK_COLOR,
-                        onPressed: () {
-                          pauseMeasure();
-                          showDialog(
-                              context: context,
-                              builder: (context) {
-                                int numberOfMeasure = state.measure[0].last.id * 4;
-                                return Dialog(
-                                  backgroundColor: Colors.white,
-                                  child: Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          "Total number of measures: $numberOfMeasure",
-                                          style: _dialogTextStyle,
-                                        ),
-                                        Divider(),
-                                      ]
-                                        ..add(SizedBox(
-                                          height: 20,
-                                        ))
-                                        ..add(CustomButton(
-                                          onPressed: () {
-                                            Navigator.of(context)
-                                                .popUntil((route) => route.isFirst);
-                                          },
-                                          text: "Exit",
-                                        )),
-                                    ),
-                                  ),
-                                );
-                              });
-                        },
-                        child: Text(
-                          'End measure',
-                          style: TextStyle(
-                              color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
-                        ),
-                      )),
-                ),
-              ),
+              _endMeasure(state),
             ]));
   }
 
@@ -213,12 +159,16 @@ class _BitalinoMeasurmentState extends State<BitalinoMeasurment> {
   }
 
   void pauseMeasure() {
-    manager.stopAcquisition();
     context.bloc<BitalinoCubit>().pauseMeasure();
   }
 
   void resumeMeasure() {
-    manager.startAcquisition();
+    if(!_wasMeasureStarted) {
+      manager.startAcquisition();
+      setState(() {
+        _wasMeasureStarted = true;
+      });
+    }
     context.bloc<BitalinoCubit>().startMeasure();
   }
 
@@ -302,6 +252,67 @@ class _BitalinoMeasurmentState extends State<BitalinoMeasurment> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _endMeasure(BitalinoState state) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SizedBox(
+        width: double.infinity,
+        child: Padding(
+            padding: const EdgeInsets.all(15),
+            child: RaisedButton(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6.0),
+                  side: BorderSide(color: UIColors.GRADIENT_DARK_COLOR)),
+              padding: const EdgeInsets.all(8),
+              color: UIColors.GRADIENT_DARK_COLOR,
+              onPressed: () {
+                pauseMeasure();
+                showDialog(
+                    context: context,
+                    builder: (context) {
+                      int numberOfMeasure = state.measure[0].last.id * 4;
+                      return Dialog(
+                        backgroundColor: Colors.white,
+                        child: Padding(
+                          padding:
+                          const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Total number of measures: $numberOfMeasure",
+                                style: _dialogTextStyle,
+                              ),
+                              Divider(),
+                            ]
+                              ..add(SizedBox(
+                                height: 20,
+                              ))
+                              ..add(CustomButton(
+                                onPressed: () {
+                                  Navigator.of(context)
+                                      .popUntil((route) => route.isFirst);
+                                  manager.stopAcquisition();
+                                  manager.endConnection();
+                                },
+                                text: "Exit",
+                              )),
+                          ),
+                        ),
+                      );
+                    });
+              },
+              child: Text(
+                'End measure',
+                style: TextStyle(
+                    color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+              ),
+            )),
+      ),
     );
   }
 }
